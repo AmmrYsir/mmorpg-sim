@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aethoria — World Sim</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f8f9fa;color:#212529;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#topbar{height:44px;background:#fff;border-bottom:1px solid #dee2e6;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+#world-title{font-weight:700;font-size:15px;color:#495057;letter-spacing:.5px}
+#clock-display{font-family:'Courier New',monospace;font-size:13px;color:#495057;background:#f1f3f5;padding:3px 10px;border-radius:4px;min-width:90px;text-align:center}
+.speed-btn{padding:3px 9px;border:1px solid #ced4da;background:#fff;border-radius:4px;cursor:pointer;font-size:12px;color:#495057;transition:all .15s}
+.speed-btn:hover{background:#e9ecef}
+.speed-btn.active{background:#4dabf7;color:#fff;border-color:#4dabf7}
+#day-counter{font-size:12px;color:#868e96;margin-left:auto;font-family:'Courier New',monospace}
+#main-layout{flex:1;display:flex;overflow:hidden}
+.panel{width:220px;background:#fff;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#left-panel{border-right:1px solid #dee2e6}
+#right-panel{border-left:1px solid #dee2e6}
+.panel-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#868e96;padding:9px 14px 6px;border-bottom:1px solid #f1f3f5;flex-shrink:0}
+.panel-section{padding:9px 14px;border-bottom:1px solid #f1f3f5;flex-shrink:0}
+.panel-section-title{font-size:10px;font-weight:600;color:#adb5bd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+#npc-list{flex:1;overflow-y:auto;padding:4px 6px}
+.npc-item{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:5px;cursor:pointer;margin-bottom:1px}
+.npc-item:hover{background:#f8f9fa}
+.npc-item.selected{background:#e7f5ff}
+.npc-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.npc-name{font-size:11px;font-weight:500;color:#343a40;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.npc-badge{font-size:10px;color:#868e96;flex-shrink:0}
+.hbar{height:2px;background:#e9ecef;border-radius:1px;margin-top:2px}
+.hfill{height:100%;border-radius:1px;background:#51cf66;transition:width .4s}
+#inspector{padding:10px 14px;border-top:1px solid #dee2e6;min-height:120px;background:#f8f9fa;flex-shrink:0}
+#inspector-name{font-size:12px;font-weight:700;color:#343a40;margin-bottom:3px}
+.irow{display:flex;justify-content:space-between;font-size:11px;color:#495057;margin-bottom:3px}
+.ival{font-family:'Courier New',monospace;color:#228be6}
+.stat-row{display:flex;justify-content:space-between;font-size:11px;color:#495057;margin-bottom:4px}
+.sval{font-family:'Courier New',monospace;font-weight:600;color:#343a40}
+.sval.pos{color:#37b24d}.sval.neg{color:#f03e3e}
+.price-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-bottom:1px solid #f8f9fa}
+.price-name{color:#495057}.price-val{font-family:'Courier New',monospace;color:#343a40}
+.slider-row{margin-bottom:9px}
+.slider-label{display:flex;justify-content:space-between;font-size:11px;color:#495057;margin-bottom:3px}
+.slider-val{font-family:'Courier New',monospace;color:#228be6;font-weight:600}
+input[type=range]{width:100%;height:4px;accent-color:#4dabf7;cursor:pointer}
+.ck-label{display:flex;align-items:center;gap:6px;font-size:11px;color:#495057;margin-bottom:5px;cursor:pointer}
+.ck-label input{accent-color:#4dabf7;cursor:pointer}
+#event-log{flex:1;overflow-y:auto;padding:5px 12px}
+.ev{padding:3px 0;border-bottom:1px solid #f8f9fa;font-size:10px;color:#495057;line-height:1.4}
+.ev .et{color:#adb5bd;font-family:monospace;margin-right:4px}
+.ev.govern{color:#7048e8}.ev.economy{color:#1971c2}.ev.social{color:#2f9e44}
+#canvas-area{flex:1;position:relative;overflow:hidden;background:#c8b99a}
+#game-canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+#bottombar{height:26px;background:#f1f3f5;border-top:1px solid #dee2e6;display:flex;align-items:center;padding:0 14px;gap:16px;flex-shrink:0;font-size:10px;color:#868e96;font-family:'Courier New',monospace}
+#bottombar b{color:#495057}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:#f8f9fa}
+::-webkit-scrollbar-thumb{background:#ced4da;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span id="world-title">⚔ Aethoria</span>
+  <span id="clock-display">06:00 ☀</span>
+  <button class="speed-btn active" data-speed="1">1×</button>
+  <button class="speed-btn" data-speed="2">2×</button>
+  <button class="speed-btn" data-speed="4">4×</button>
+  <button class="speed-btn" data-speed="0">⏸</button>
+  <span id="day-counter">Day 1</span>
+</div>
+
+<div id="main-layout">
+  <div class="panel" id="left-panel">
+    <div class="panel-title">NPCs</div>
+    <div id="npc-list"></div>
+    <div id="inspector">
+      <div id="inspector-name" style="color:#adb5bd;font-size:12px">Select an NPC</div>
+    </div>
+  </div>
+
+  <div id="canvas-area">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <div class="panel" id="right-panel">
+    <div class="panel-title">Economy</div>
+    <div class="panel-section">
+      <div class="panel-section-title">Treasury</div>
+      <div class="stat-row"><span>Balance</span><span class="sval pos" id="sv-treasury">$5000</span></div>
+      <div class="stat-row"><span>Daily Income</span><span class="sval" id="sv-income">$0</span></div>
+      <div class="stat-row"><span>Avg Happiness</span><span class="sval" id="sv-happy">80%</span></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">Market Prices</div>
+      <div class="price-row"><span class="price-name">Food</span><span class="price-val" id="pv-food">$10.0</span></div>
+      <div class="price-row"><span class="price-name">Wood</span><span class="price-val" id="pv-wood">$15.0</span></div>
+      <div class="price-row"><span class="price-name">Stone</span><span class="price-val" id="pv-stone">$20.0</span></div>
+      <div class="price-row"><span class="price-name">Luxury</span><span class="price-val" id="pv-luxury">$50.0</span></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">Policies</div>
+      <div class="slider-row">
+        <div class="slider-label"><span>Tax Rate</span><span class="slider-val" id="sv-tax">10%</span></div>
+        <input type="range" id="sl-tax" min="0" max="50" value="10">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label"><span>Wage Floor</span><span class="slider-val" id="sv-wage">$10</span></div>
+        <input type="range" id="sl-wage" min="5" max="50" value="10">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label"><span>Infra Spend</span><span class="slider-val" id="sv-infra">20%</span></div>
+        <input type="range" id="sl-infra" min="0" max="50" value="20">
+      </div>
+      <label class="ck-label"><input type="checkbox" id="ck-trade" checked> Open Trade</label>
+      <label class="ck-label"><input type="checkbox" id="ck-guards" checked> Guard Patrols</label>
+    </div>
+    <div class="panel-title">Event Log</div>
+    <div id="event-log"></div>
+  </div>
+</div>
+
+<div id="bottombar">
+  FPS: <b id="db-fps">60</b> &nbsp;|&nbsp;
+  NPCs: <b id="db-npcs">0</b> &nbsp;|&nbsp;
+  Batch: <b id="db-batch">0/0</b> &nbsp;|&nbsp;
+  <b id="db-event" style="color:#7048e8">—</b>
+</div>
+
+<script>
+'use strict';
+
+// ─── Constants ───────────────────────────────────────────────
+const TILE = 16;
+const MAP_W = 50;
+const MAP_H = 38;
+const BATCH = 20;
+const GAME_SPEED_FACTOR = 60; // 1 real-sec = 60 in-game seconds
+
+const T = { GRASS:0, ROAD:1, BUILD:2, WATER:3, PLAZA:4, TREE:5 };
+
+const ROLE_COLOR = {
+  worker:'#4dabf7', merchant:'#fcc419', guard:'#ff6b6b', politician:'#cc5de8'
+};
+
+// hour-based schedules: [startHr, endHr, state]
+const SCHED = {
+  worker:     [[22,6,'sleep'],[6,8,'→work'],[8,17,'work'],[17,18,'→plaza'],[18,21,'social'],[21,22,'→home']],
+  merchant:   [[22,7,'sleep'],[7,9,'→work'],[9,18,'work'],[18,19,'→plaza'],[19,21,'social'],[21,22,'→home']],
+  guard:      [[23,6,'sleep'],[6,7,'→work'],[7,19,'work'],[19,20,'→plaza'],[20,22,'social'],[22,23,'→home']],
+  politician: [[22,7,'sleep'],[7,8,'→work'],[8,16,'work'],[16,17,'govern'],[17,19,'→plaza'],[19,21,'social'],[21,22,'→home']]
+};
+
+// ─── World state ─────────────────────────────────────────────
+const W = {
+  time: 6.0, day: 1, speed: 1, paused: false,
+  map: null, npcs: [], selectedNPC: null,
+  plazaX: 0, plazaY: 0,
+  policies: { tax: 0.10, wage: 10, infra: 0.20, trade: true, guards: true },
+  eco: {
+    goods: {
+      food:   { supply:100, demand:80,  price:10,  base:10  },
+      wood:   { supply:60,  demand:50,  price:15,  base:15  },
+      stone:  { supply:40,  demand:40,  price:20,  base:20  },
+      luxury: { supply:20,  demand:30,  price:50,  base:50  }
+    },
+    treasury: 5000, income: 0
+  }
+};
+
+// ─── Map generation ──────────────────────────────────────────
+function buildMap() {
+  const map = Array.from({length: MAP_H}, () => new Uint8Array(MAP_W).fill(T.GRASS));
+
+  // Water+tree border
+  for (let y = 0; y < MAP_H; y++)
+    for (let x = 0; x < MAP_W; x++) {
+      if (x < 2 || x >= MAP_W-2 || y < 2 || y >= MAP_H-2) map[y][x] = T.WATER;
+      else if (x < 3 || x >= MAP_W-3 || y < 3 || y >= MAP_H-3) map[y][x] = T.TREE;
+    }
+
+  const mX = Math.floor(MAP_W/2), mY = Math.floor(MAP_H/2);
+
+  // Main cross roads
+  for (let x = 3; x < MAP_W-3; x++) { map[mY][x] = T.ROAD; map[mY+1][x] = T.ROAD; }
+  for (let y = 3; y < MAP_H-3; y++) { map[y][mX] = T.ROAD; map[y][mX+1] = T.ROAD; }
+
+  // Secondary roads
+  [9, MAP_H-10].forEach(ry => {
+    for (let x = 3; x < MAP_W-3; x++) map[ry][x] = T.ROAD;
+  });
+  [9, MAP_W-10].forEach(rx => {
+    for (let y = 3; y < MAP_H-3; y++) map[y][rx] = T.ROAD;
+  });
+
+  // Plaza
+  W.plazaX = mX - 3; W.plazaY = mY - 3;
+  for (let dy = -3; dy <= 3; dy++)
+    for (let dx = -3; dx <= 3; dx++)
+      map[mY+dy][mX+dx] = T.PLAZA;
+
+  // Scatter trees on grass patches
+  for (let y = 4; y < MAP_H-4; y++)
+    for (let x = 4; x < MAP_W-4; x++)
+      if (map[y][x] === T.GRASS && Math.random() < 0.08) map[y][x] = T.TREE;
+
+  // Buildings in zones between roads
+  const zones = [
+    [4,4,mX-2,9],[mX+3,4,MAP_W-4,9],
+    [4,10,9,mY-2],[MAP_W-10,10,MAP_W-4,mY-2],
+    [4,mY+3,9,MAP_H-10],[MAP_W-10,mY+3,MAP_W-4,MAP_H-10],
+    [4,MAP_H-9,mX-2,MAP_H-4],[mX+3,MAP_H-9,MAP_W-4,MAP_H-4]
+  ];
+
+  for (const [x1,y1,x2,y2] of zones) {
+    let cy = y1;
+    while (cy < y2-1) {
+      let cx = x1;
+      while (cx < x2-1) {
+        const bw = 2+Math.floor(Math.random()*2);
+        const bh = 2+Math.floor(Math.random()*2);
+        if (cx+bw <= x2 && cy+bh <= y2) {
+          for (let by = cy; by < cy+bh; by++)
+            for (let bx = cx; bx < cx+bw; bx++)
+              map[by][bx] = T.BUILD;
+        }
+        cx += bw + 1 + Math.floor(Math.random()*2);
+      }
+      cy += 3 + Math.floor(Math.random()*2);
+    }
+  }
+
+  return map;
+}
+
+// ─── Pathfinding (BFS, parent-pointer, no array spread) ──────
+const DIRS4 = [[-1,0],[1,0],[0,-1],[0,1]];
+
+function walkable(x, y) {
+  if (x<0||x>=MAP_W||y<0||y>=MAP_H) return false;
+  const t = W.map[y][x];
+  return t===T.ROAD||t===T.PLAZA||t===T.GRASS;
+}
+
+function findPath(sx, sy, tx, ty) {
+  if (sx===tx && sy===ty) return [];
+  const stride = MAP_W;
+  const vis = new Uint8Array(MAP_W*MAP_H);
+  const parX = new Int8Array(MAP_W*MAP_H);
+  const parY = new Int8Array(MAP_W*MAP_H);
+  const q = []; let head = 0;
+  q.push(sx, sy);
+  vis[sy*stride+sx] = 1;
+  let found = false;
+
+  while (head < q.length) {
+    const cx = q[head++], cy = q[head++];
+    for (const [dx,dy] of DIRS4) {
+      const nx=cx+dx, ny=cy+dy;
+      if (nx<0||nx>=MAP_W||ny<0||ny>=MAP_H) continue;
+      const ni = ny*stride+nx;
+      if (vis[ni]) continue;
+      if (!walkable(nx,ny)) continue;
+      vis[ni]=1; parX[ni]=cx; parY[ni]=cy;
+      if (nx===tx && ny===ty) { found=true; break; }
+      q.push(nx,ny);
+    }
+    if (found) break;
+  }
+
+  if (!found) return [[tx,ty]];
+
+  const path=[]; let cx=tx, cy=ty, safe=0;
+  while ((cx!==sx||cy!==sy) && safe++<300) {
+    path.unshift([cx,cy]);
+    const ni=cy*stride+cx;
+    const px=parX[ni], py=parY[ni];
+    cx=px; cy=py;
+  }
+  return path;
+}
+
+// ─── NPC ─────────────────────────────────────────────────────
+const FNAMES = ['Aria','Bela','Cora','Dena','Elsa','Fara','Hana','Iris','Jana','Kira'];
+const MNAMES = ['Aldo','Bern','Cade','Dorn','Erik','Finn','Gale','Haro','Ivan','Jorn'];
+let _nameIdx = 0;
+function rndName() {
+  const pool = Math.random()<.5 ? MNAMES : FNAMES;
+  return pool[_nameIdx%pool.length] + ' ' + String.fromCharCode(65+Math.floor(Math.random()*26));
+  _nameIdx++;
+}
+
+function roadTile() {
+  for (let i=0;i<300;i++) {
+    const x=3+Math.floor(Math.random()*(MAP_W-6));
+    const y=3+Math.floor(Math.random()*(MAP_H-6));
+    if (W.map[y][x]===T.ROAD||W.map[y][x]===T.PLAZA) return {x,y};
+  }
+  return {x:Math.floor(MAP_W/2), y:Math.floor(MAP_H/2)};
+}
+
+let _npcId = 0;
+function spawnNPC(role) {
+  const home = roadTile();
+  const work = role==='politician'
+    ? {x:W.plazaX+2, y:W.plazaY+2}
+    : roadTile();
+  return {
+    id: _npcId++,
+    name: rndName(),
+    role,
+    state: 'sleep',
+    x: home.x, y: home.y,
+    homeX: home.x, homeY: home.y,
+    workX: work.x, workY: work.y,
+    wallet: 80+Math.random()*120,
+    happiness: .6+Math.random()*.4,
+    wage: Math.max(10, 10+Math.random()*20),
+    color: ROLE_COLOR[role],
+    path: [],
+    moveT: 0,
+    wanderT: 0,
+    active: true
+  };
+}
+
+function schedState(role, hr) {
+  for (const [s,e,st] of SCHED[role]) {
+    if (s < e ? (hr>=s && hr<e) : (hr>=s || hr<e)) return st;
+  }
+  return 'sleep';
+}
+
+let batchIdx = 0;
+
+function updateNPCs(gameDt) {
+  const npcs = W.npcs;
+  if (!npcs.length) return;
+  const end = Math.min(batchIdx+BATCH, npcs.length);
+
+  for (let i=batchIdx; i<end; i++) {
+    const n = npcs[i];
+    if (!n.active) continue;
+
+    // State machine
+    const desired = schedState(n.role, W.time);
+    if (n.state !== desired) {
+      n.state = desired;
+      n.path = [];
+      if (desired==='→work') n.path = findPath(n.x,n.y,n.workX,n.workY);
+      else if (desired==='→home') n.path = findPath(n.x,n.y,n.homeX,n.homeY);
+      else if (desired==='→plaza') n.path = findPath(n.x,n.y,
+        W.plazaX+1+Math.floor(Math.random()*5),
+        W.plazaY+1+Math.floor(Math.random()*5));
+      else if (desired==='govern') governNPC(n);
+    }
+
+    // Movement
+    n.moveT += gameDt;
+    const moveSpeed = 0.4; // in-game seconds per tile
+    if (n.path.length && n.moveT >= moveSpeed) {
+      n.moveT = 0;
+      const [nx,ny] = n.path.shift();
+      n.x=nx; n.y=ny;
+    }
+
+    // Wander when socializing
+    if (n.state==='social') {
+      n.wanderT -= gameDt;
+      if (n.wanderT<=0) {
+        n.wanderT = 2+Math.random()*3;
+        const opts = DIRS4.map(([dx,dy])=>[n.x+dx,n.y+dy]).filter(([a,b])=>walkable(a,b));
+        if (opts.length) { const [a,b]=opts[Math.floor(Math.random()*opts.length)]; n.x=a;n.y=b; }
+      }
+    }
+
+    // Economy: earn during work
+    if (n.state==='work') n.wallet += n.wage * gameDt / 3600;
+
+    // Spend during social
+    if (n.state==='social' && n.wallet>20 && Math.random()<0.0005) {
+      const goods = Object.values(W.eco.goods);
+      const g = goods[Math.floor(Math.random()*goods.length)];
+      if (n.wallet >= g.price) {
+        n.wallet -= g.price;
+        g.demand += 0.2;
+        W.eco.treasury += g.price * W.policies.tax;
+      }
+    }
+
+    // Happiness dynamics
+    const target = Math.min(1, .4 + (n.wallet/300)*.3 + W.policies.infra*.4 - W.policies.tax*.5);
+    n.happiness += (target - n.happiness) * gameDt * 0.0005;
+    n.happiness = Math.max(0, Math.min(1, n.happiness));
+  }
+
+  batchIdx = end >= npcs.length ? 0 : end;
+  document.getElementById('db-batch').textContent = `${batchIdx}/${npcs.length}`;
+}
+
+function governNPC(npc) {
+  const npcs = W.npcs;
+  const avgH = npcs.reduce((s,n)=>s+n.happiness,0)/npcs.length;
+  let msg = '';
+
+  if (avgH < 0.35 && W.policies.tax > 0.05) {
+    W.policies.tax = Math.max(0.05, W.policies.tax-.02);
+    document.getElementById('sl-tax').value = W.policies.tax*100;
+    document.getElementById('sv-tax').textContent = (W.policies.tax*100).toFixed(0)+'%';
+    msg = `${npc.name} cut taxes → ${(W.policies.tax*100).toFixed(0)}%`;
+  } else if (W.eco.treasury < 800 && W.policies.tax < 0.30) {
+    W.policies.tax = Math.min(0.30, W.policies.tax+.02);
+    document.getElementById('sl-tax').value = W.policies.tax*100;
+    document.getElementById('sv-tax').textContent = (W.policies.tax*100).toFixed(0)+'%';
+    msg = `${npc.name} raised taxes → ${(W.policies.tax*100).toFixed(0)}%`;
+  } else if (W.eco.treasury > 4000 && W.policies.infra < 0.35) {
+    W.policies.infra = Math.min(0.40, W.policies.infra+.05);
+    document.getElementById('sl-infra').value = W.policies.infra*100;
+    document.getElementById('sv-infra').textContent = (W.policies.infra*100).toFixed(0)+'%';
+    msg = `${npc.name} boosted infrastructure`;
+  } else {
+    msg = `${npc.name} held current policies`;
+  }
+  logEvent(msg, 'govern');
+}
+
+// ─── Economy ─────────────────────────────────────────────────
+let ecoTimer = 0;
+
+function updateEconomy(gameDt) {
+  ecoTimer += gameDt;
+  if (ecoTimer < 3600) return; // once per in-game hour
+  ecoTimer -= 3600;
+
+  for (const g of Object.values(W.eco.goods)) {
+    const ratio = g.demand / Math.max(1, g.supply);
+    g.price = Math.max(1, g.price*.9 + g.base*ratio*.1);
+    g.supply = Math.min(200, g.supply*1.02+.5);
+    g.demand = Math.max(10, g.demand*.98);
+  }
+
+  const totalWage = W.npcs.reduce((s,n)=>s+n.wage,0);
+  const taxIn = totalWage * W.policies.tax / 24;
+  const infraOut = Math.max(0, W.eco.treasury) * W.policies.infra / 24;
+  W.eco.treasury += taxIn - infraOut;
+  W.eco.income = (taxIn - infraOut) * 24;
+}
+
+// ─── Renderer ────────────────────────────────────────────────
+const TCOL = ['#7cb87c','#9e9e8e','#b0bec5','#4fc3f7','#d4c5a0','#5a8a40'];
+const BCOLS = ['#b0bec5','#c5cae9','#ffe0b2','#d7ccc8','#f8bbd9','#dcedc8'];
+
+let mapCanvas, mapCtx, canvas, ctx, camX=0, camY=0;
+
+function buildMapCanvas() {
+  mapCanvas = document.createElement('canvas');
+  mapCanvas.width = MAP_W*TILE; mapCanvas.height = MAP_H*TILE;
+  mapCtx = mapCanvas.getContext('2d');
+  mapCtx.imageSmoothingEnabled = false;
+
+  // Draw tiles
+  for (let y=0;y<MAP_H;y++)
+    for (let x=0;x<MAP_W;x++) {
+      mapCtx.fillStyle = TCOL[W.map[y][x]];
+      mapCtx.fillRect(x*TILE,y*TILE,TILE,TILE);
+    }
+
+  // Draw buildings with color variants and door
+  let bi=0;
+  for (let y=0;y<MAP_H;y++)
+    for (let x=0;x<MAP_W;x++)
+      if (W.map[y][x]===T.BUILD) {
+        mapCtx.fillStyle = BCOLS[Math.floor(Math.random()*BCOLS.length)];
+        mapCtx.fillRect(x*TILE,y*TILE,TILE,TILE);
+        // Top shadow
+        mapCtx.fillStyle='rgba(0,0,0,.12)';
+        mapCtx.fillRect(x*TILE,y*TILE,TILE,2);
+      }
+
+  // Plaza circle detail
+  mapCtx.strokeStyle='rgba(180,160,100,.4)';
+  mapCtx.lineWidth=1;
+  mapCtx.beginPath();
+  mapCtx.arc((W.plazaX+3.5)*TILE,(W.plazaY+3.5)*TILE,3*TILE,0,Math.PI*2);
+  mapCtx.stroke();
+
+  // Subtle grid
+  mapCtx.strokeStyle='rgba(0,0,0,.03)';
+  mapCtx.lineWidth=.5;
+  for(let x=0;x<=MAP_W;x++){mapCtx.beginPath();mapCtx.moveTo(x*TILE,0);mapCtx.lineTo(x*TILE,MAP_H*TILE);mapCtx.stroke();}
+  for(let y=0;y<=MAP_H;y++){mapCtx.beginPath();mapCtx.moveTo(0,y*TILE);mapCtx.lineTo(MAP_W*TILE,y*TILE);mapCtx.stroke();}
+}
+
+function resizeCanvas() {
+  const area = document.getElementById('canvas-area');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
+  ctx.imageSmoothingEnabled = false;
+  camX = Math.max(0, Math.floor((MAP_W*TILE - canvas.width)/2));
+  camY = Math.max(0, Math.floor((MAP_H*TILE - canvas.height)/2));
+}
+
+function render() {
+  const cw=canvas.width, ch=canvas.height;
+  ctx.drawImage(mapCanvas, -camX, -camY);
+
+  // Day/night overlay
+  const hr = W.time;
+  let alpha=0, rgb='0,10,60';
+  if (hr>=22||hr<4) alpha=.38;
+  else if (hr>=20) alpha=(hr-20)/2*.38;
+  else if (hr>=4&&hr<6) { alpha=(1-(hr-4)/2)*.15; rgb='255,140,0'; }
+  else if (hr>=6&&hr<7) { alpha=(1-(hr-6))*.08; rgb='255,200,80'; }
+  if (alpha>0.005) {
+    ctx.fillStyle=`rgba(${rgb},${alpha.toFixed(3)})`;
+    ctx.fillRect(0,0,cw,ch);
+  }
+
+  // NPCs
+  for (const n of W.npcs) {
+    const sx = n.x*TILE - camX;
+    const sy = n.y*TILE - camY;
+    if (sx<-TILE||sx>cw||sy<-TILE||sy>ch) continue;
+
+    // Shadow
+    ctx.fillStyle='rgba(0,0,0,.18)';
+    ctx.fillRect(sx+3,sy+TILE-3,TILE-6,3);
+    // Body
+    ctx.fillStyle = n.color;
+    ctx.fillRect(sx+2,sy+4,TILE-4,TILE-6);
+    // Head
+    ctx.fillStyle='#ffe0b2';
+    ctx.fillRect(sx+4,sy+1,TILE-8,4);
+
+    if (n===W.selectedNPC) {
+      ctx.strokeStyle='#fff';
+      ctx.lineWidth=1.5;
+      ctx.strokeRect(sx+.5,sy+.5,TILE-1,TILE-1);
+    }
+  }
+
+  // Selection arrow
+  if (W.selectedNPC) {
+    const s=W.selectedNPC;
+    const ax=s.x*TILE-camX+TILE/2, ay=s.y*TILE-camY-3;
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax-4,ay-6); ctx.lineTo(ax+4,ay-6); ctx.fill();
+  }
+}
+
+// ─── UI ──────────────────────────────────────────────────────
+let uiLastUpdate = 0;
+
+function updateUI(ts) {
+  if (ts - uiLastUpdate < 500) return;
+  uiLastUpdate = ts;
+
+  // Clock
+  const h=Math.floor(W.time), m=Math.floor((W.time%1)*60);
+  document.getElementById('clock-display').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${(h>=6&&h<20)?'☀':'🌙'}`;
+  document.getElementById('day-counter').textContent = `Day ${W.day}`;
+
+  // Economy stats
+  const t=W.eco.treasury;
+  const tel=document.getElementById('sv-treasury');
+  tel.textContent='$'+Math.floor(t).toLocaleString();
+  tel.className='sval '+(t>=0?'pos':'neg');
+  const inc=W.eco.income;
+  const iel=document.getElementById('sv-income');
+  iel.textContent=(inc>=0?'+':'')+Math.floor(inc);
+  iel.className='sval '+(inc>=0?'pos':'neg');
+  const avgH=W.npcs.length?W.npcs.reduce((s,n)=>s+n.happiness,0)/W.npcs.length:0;
+  document.getElementById('sv-happy').textContent=(avgH*100).toFixed(0)+'%';
+
+  // Prices
+  const g=W.eco.goods;
+  document.getElementById('pv-food').textContent='$'+g.food.price.toFixed(1);
+  document.getElementById('pv-wood').textContent='$'+g.wood.price.toFixed(1);
+  document.getElementById('pv-stone').textContent='$'+g.stone.price.toFixed(1);
+  document.getElementById('pv-luxury').textContent='$'+g.luxury.price.toFixed(1);
+
+  // NPC list
+  updateNPCList();
+  updateInspector();
+}
+
+function updateNPCList() {
+  const el = document.getElementById('npc-list');
+  const npcs = W.npcs;
+  if (el.children.length !== npcs.length) {
+    el.innerHTML = '';
+    npcs.forEach(n => {
+      const d = document.createElement('div');
+      d.className='npc-item'+(n===W.selectedNPC?' selected':'');
+      d.dataset.id=n.id;
+      d.innerHTML=`<div class="npc-dot" style="background:${n.color}"></div>
+        <div style="flex:1;min-width:0">
+          <div class="npc-name">${n.name}</div>
+          <div class="hbar"><div class="hfill" style="width:${(n.happiness*100).toFixed(0)}%"></div></div>
+        </div>
+        <div class="npc-badge">${n.state}</div>`;
+      d.addEventListener('click',()=>{W.selectedNPC=n;updateNPCList();updateInspector();});
+      el.appendChild(d);
+    });
+  } else {
+    const items=el.querySelectorAll('.npc-item');
+    npcs.forEach((n,i)=>{
+      items[i].className='npc-item'+(n===W.selectedNPC?' selected':'');
+      items[i].querySelector('.hfill').style.width=(n.happiness*100).toFixed(0)+'%';
+      items[i].querySelector('.npc-badge').textContent=n.state;
+    });
+  }
+}
+
+function updateInspector() {
+  const n=W.selectedNPC;
+  const el=document.getElementById('inspector');
+  if (!n) { el.innerHTML='<div id="inspector-name" style="color:#adb5bd;font-size:12px">Select an NPC</div>'; return; }
+  el.innerHTML=`
+    <div id="inspector-name">${n.name}</div>
+    <div style="font-size:10px;color:${n.color};font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${n.role}</div>
+    <div class="irow"><span>State</span><span class="ival">${n.state}</span></div>
+    <div class="irow"><span>Wallet</span><span class="ival">$${Math.floor(n.wallet)}</span></div>
+    <div class="irow"><span>Wage</span><span class="ival">$${n.wage.toFixed(1)}/hr</span></div>
+    <div class="irow"><span>Happiness</span><span class="ival">${(n.happiness*100).toFixed(0)}%</span></div>
+    <div class="irow"><span>Pos</span><span class="ival">${n.x},${n.y}</span></div>`;
+}
+
+function logEvent(msg, type='info') {
+  const h=Math.floor(W.time), m=Math.floor((W.time%1)*60);
+  const el=document.getElementById('event-log');
+  const d=document.createElement('div');
+  d.className=`ev ${type}`;
+  d.innerHTML=`<span class="et">D${W.day} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}</span>${msg}`;
+  el.insertBefore(d,el.firstChild);
+  while(el.children.length>40) el.removeChild(el.lastChild);
+  document.getElementById('db-event').textContent=msg.slice(0,45);
+}
+
+// ─── Main loop ───────────────────────────────────────────────
+let lastTs=0, fps=60, fpsT=0, fpsF=0;
+
+function loop(ts) {
+  const rawDt = Math.min((ts-lastTs)/1000, .1);
+  lastTs=ts;
+  fpsF++; fpsT+=rawDt;
+  if(fpsT>=1){fps=Math.round(fpsF/fpsT);document.getElementById('db-fps').textContent=fps;fpsT=0;fpsF=0;}
+
+  if(!W.paused) {
+    const dt = rawDt * W.speed;
+    const gameDt = dt * GAME_SPEED_FACTOR; // in-game seconds
+    W.time += gameDt / 3600;
+    if(W.time>=24){W.time-=24;W.day++;logEvent(`Day ${W.day} begins`,'economy');}
+    updateNPCs(gameDt);
+    updateEconomy(gameDt);
+  }
+
+  render();
+  updateUI(ts);
+  requestAnimationFrame(loop);
+}
+
+// ─── Init ────────────────────────────────────────────────────
+function init() {
+  W.map = buildMap();
+
+  // Spawn NPCs
+  const counts = {worker:55, merchant:15, guard:15, politician:5};
+  for(const[role,count] of Object.entries(counts))
+    for(let i=0;i<count;i++) W.npcs.push(spawnNPC(role));
+  document.getElementById('db-npcs').textContent=W.npcs.length;
+
+  // Canvas setup
+  canvas = document.getElementById('game-canvas');
+  ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  buildMapCanvas();
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // Policy controls
+  document.getElementById('sl-tax').addEventListener('input',e=>{
+    W.policies.tax=e.target.value/100;
+    document.getElementById('sv-tax').textContent=e.target.value+'%';
+  });
+  document.getElementById('sl-wage').addEventListener('input',e=>{
+    W.policies.wage=+e.target.value;
+    document.getElementById('sv-wage').textContent='$'+e.target.value;
+    W.npcs.forEach(n=>n.wage=Math.max(W.policies.wage,n.wage));
+  });
+  document.getElementById('sl-infra').addEventListener('input',e=>{
+    W.policies.infra=e.target.value/100;
+    document.getElementById('sv-infra').textContent=e.target.value+'%';
+  });
+  document.getElementById('ck-trade').addEventListener('change',e=>{
+    W.policies.trade=e.target.checked;
+    logEvent('Trade: '+(e.target.checked?'Open':'Closed'),'govern');
+  });
+  document.getElementById('ck-guards').addEventListener('change',e=>{
+    W.policies.guards=e.target.checked;
+    logEvent('Guard patrols: '+(e.target.checked?'On':'Off'),'govern');
+  });
+
+  // Speed controls
+  document.querySelectorAll('.speed-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const s=+btn.dataset.speed;
+      W.speed=s; W.paused=s===0;
+      document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  logEvent('World of Aethoria initialized','economy');
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+</body>
+</html>
