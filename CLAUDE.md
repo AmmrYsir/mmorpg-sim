@@ -61,3 +61,43 @@ Supply and demand are tracked per good. Shop prices adjust each in-game day. NPC
 - Single `index.html` is the canonical deliverable; JS modules may be embedded as `<script>` blocks or separate files loaded via `<script type="module">`.
 - No external dependencies. If a utility is needed, inline it.
 - Canvas or `div`-grid rendering only — no WebGL, no SVG animation loops.
+
+## UI Design Spec
+
+### Layout
+
+```
+┌────────────────────────────────────────────────────┐
+│  Top bar: world name · clock · speed controls      │
+├──────────────┬─────────────────────┬───────────────┤
+│  Left panel  │   Canvas (main)     │  Right panel  │
+│  NPC Stats   │   Pixel-art world   │  Economy      │
+│  Inspector   │   2D top-down view  │  Overview     │
+│              │                     │               │
+│              │                     │  Policy       │
+│              │                     │  Controls     │
+├──────────────┴─────────────────────┴───────────────┤
+│  Bottom bar: debug info · NPC count · FPS          │
+└────────────────────────────────────────────────────┘
+```
+
+### Rendering
+
+- Main view is a **`<canvas>`** element with a pixel-art 2D top-down world.
+- NPCs rendered as small colored sprites (8×8 px tiles); color encodes role (e.g., blue = worker, red = guard, gold = merchant, purple = politician).
+- Day/night tinted by overlaying a semi-transparent color on the canvas (warm yellow at dawn, deep blue at night).
+- `imageSmoothingEnabled = false` on the canvas context to preserve pixel-art crispness.
+
+### Theme
+
+- **Light clean dashboard** — white/off-white background (`#f8f9fa`), dark text (`#212529`), accent color per panel.
+- Panels use subtle card shadows, no heavy borders.
+- Monospace font for numeric readouts (clock, prices, counts).
+- Canvas background: light parchment (`#e8dcc8`) for the world map tiles.
+
+### Panels
+
+- **Left — NPC Stats / Inspector**: shows a scrollable list of NPCs with role icon, name, state, happiness bar. Clicking an NPC locks the inspector to that NPC's detail view (wallet, schedule, current action).
+- **Right — Economy**: live price table for tracked goods, treasury balance, tax rate slider (player-controlled). Below it, **Policy Controls**: wage floor toggle, law checkboxes, infrastructure spend slider.
+- **Top bar**: world clock (HH:MM in-game), day counter, speed buttons (1×/2×/4×/pause).
+- **Bottom bar**: debug strip — real FPS, NPC count, active batch index, last politician decision.
